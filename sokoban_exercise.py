@@ -118,46 +118,72 @@ def can_enter(board, destination):
     デモ版では walls という名前だが、演習版では solid に入っている。
     """
     # TODO 2: 条件を実装する（現状では壁も通過できる）
-    return in_field(board, destination)
+    return in_field(board, destination) and destination not in board["solid"]
 
 
 def push_crate(board, crate_position, vector):
-    """TODO 3：箱を押す。引数：board, 箱座標, 移動方向。戻り値：押せたらTrue。
+    """箱を押せる場合だけ移動させる。"""
 
-    箱の一つ先に別の箱や壁がある場合は押せない。
-    押せる場合は箱の集合を変更する。押せないときは変更しない。
-    デモ版の辞書キー boxes と、演習版の crates は異なる。
-    """
-    # TODO 3: 箱の行き先を調べ、移動可能なら crates を更新する
-    return False
+    # 箱を押した後の位置
+    destination = next_position(crate_position, vector)
+
+    # 壁または盤面外なら押せない
+    if not can_enter(board, destination):
+        return False
+
+    # 移動先に別の箱があれば押せない
+    if destination in board["crates"]:
+        return False
+
+    # 元の位置から箱を取り除く
+    board["crates"].remove(crate_position)
+
+    # 新しい位置に箱を置く
+    board["crates"].add(destination)
+
+    return True
 
 def apply_move(board, direction_key):
+    """プレイヤーの移動、壁判定、箱押しを処理する。"""
+
+    # WASD以外のキーは無効
     if direction_key not in KEY_TO_VECTOR:
         return False
 
+    # 移動方向を取得
     vector = KEY_TO_VECTOR[direction_key]
 
-    # 現在位置
+    # プレイヤーの現在位置
     current = board["hero"]
 
-    # 次の位置を計算
+    # 次の移動先を計算
     destination = next_position(current, vector)
 
-    # 盤面の外には移動できない
-    if not in_field(board, destination):
+    # 壁や盤面外なら移動しない
+    if not can_enter(board, destination):
         return False
 
-    # 移動前の状態を保存
-    board["past"].append((board["hero"], board["crates"].copy()))
+    # 移動前の状態を保存（Undo用）
+    previous_hero = board["hero"]
+    previous_crates = board["crates"].copy()
 
-    # プレイヤーを移動
+    # 移動先に箱がある場合
+    if destination in board["crates"]:
+
+        # 箱を押せなければ移動しない
+        if not push_crate(board, destination, vector):
+            return False
+
+    # 移動前の状態を履歴に保存
+    board["past"].append((previous_hero, previous_crates))
+
+    # プレイヤーの位置を更新
     board["hero"] = destination
 
     # 移動回数を増やす
     board["steps"] += 1
 
     return True
-
 
 def step_back(board):
     """Undoを実行。引数：board。戻り値：なし。"""
